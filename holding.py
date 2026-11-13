@@ -2,7 +2,7 @@
 """Print which Claude Code agents still hold background work although Herdr shows them done or idle.
 
 Output: {"<terminal address>": "<why>"}, e.g. {"t17": "schedule 17 9,13,17 * * 1-5", "t2m": "1 monitor"}.
-Agents on this machine only. The cases and their sources: README.md.
+Agents on other machines get the footer counts only. The cases and their sources: README.md.
 
 Three sources, all Claude Code internals:
   session   <config dir>/sessions/<pid>.json ($CLAUDE_CONFIG_DIR and every ~/.claude* that has one): status "shell" (background shell or shell monitor)
@@ -153,9 +153,8 @@ def main():
         terms = json.loads(hc("ls", "--json"))["terminals"]
     except (ValueError, KeyError):
         sys.exit("holding: hc ls failed")
-    # Only where Herdr shows nothing going on; "/" in an address means another machine.
-    terms = [t for t in terms if t.get("agent") == "claude-code" and t.get("status") in ("done", "idle")
-             and "/" not in t["address"]]
+    # Only where Herdr shows nothing going on.
+    terms = [t for t in terms if t.get("agent") == "claude-code" and t.get("status") in ("done", "idle")]
     try:
         cache = json.load(open(CACHE))
     except (OSError, ValueError):
@@ -165,7 +164,8 @@ def main():
         seen = list(pool.map(inspect, terms))
     for address, pid, counts in seen:
         why = list(counts)
-        if pid in known:
+        # "/" in an address means another machine: its pid means nothing here, only the footer applies.
+        if "/" not in address and pid in known:
             session, config_dir = known[pid]
             status, age = session.get("status"), now - session.get("statusUpdatedAt", 0) / 1000
             if not why and status == "shell":

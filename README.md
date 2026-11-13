@@ -6,7 +6,7 @@ adds a "Waiting" section to the Agents list for those agents, with the reason on
 ("1 monitor", "schedule", "wakes 14:30").
 
 Verified against Claude Code 2.1.323. Every source is a Claude Code internal and may change.
-Agents on this machine only.
+Agents on other machines get the footer counts only (monitors and shells).
 
 ## Install
 
@@ -51,7 +51,7 @@ Everything else stays as Herdr reports it. If a source stops working, rows fall 
   records them: check the session file's `status` values and `holding.py`'s footer parsing
   against a real one.
 - A saved schedule (case 6) created by an earlier session and picked up by this one is not seen.
-- Agents on other machines are skipped: the files live there.
+- Agents on other machines (`<machine>/tN`) are covered by the footer only: their session files and transcripts live there, so schedules, wake-ups, PR watches and background agents are not seen.
 - Not detected at all, because nothing is running: an agent waiting on a person, a turn cut short
   by an error or a limit, and unsent text in the prompt box.
 
