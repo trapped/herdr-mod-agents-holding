@@ -72,7 +72,10 @@ def write(path, text):
 
 
 def main():
-    src = (SHIPPED / "main.js").read_text()
+    try:
+        src = (SHIPPED / "main.js").read_text()
+    except OSError:
+        sys.exit("agents-holding: Herdr's own agents mod isn't there yet (start Herdr once), skipped")
     for old, new in EDITS:
         if src.count(old) != 1:
             sys.exit(f"agents-holding: Herdr's agents mod changed, this edit no longer fits: {old.strip()[:70]}")
