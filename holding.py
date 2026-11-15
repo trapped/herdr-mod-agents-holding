@@ -2,7 +2,8 @@
 """Print which Claude Code agents still hold background work although Herdr shows them done or idle.
 
 Output: {"<terminal address>": "<why>"}, e.g. {"t17": "schedule 17 9,13,17 * * 1-5", "t2m": "1 monitor"}.
-Agents on other machines get the footer counts only. The cases and their sources: README.md.
+Other machines (hc machine ls) run this same script over `hc exec --on`; their rows come back as <machine>/<terminal>.
+The cases and their sources: README.md.
 
 Three sources, all Claude Code internals:
   session   <config dir>/sessions/<pid>.json ($CLAUDE_CONFIG_DIR and every ~/.claude* that has one): status "shell" (background shell or shell monitor)
@@ -148,24 +149,42 @@ def inspect(term):
     return term["address"], pid, footer(term["address"])
 
 
+def remote(machine):
+    """Another machine's answer: this same script, run there with --local, keys prefixed with its name."""
+    try:
+        r = subprocess.run(["hc", "exec", "-i", "--on", machine, "python3", "-", "--local"],
+                           input=open(__file__).read(), capture_output=True, text=True, timeout=30)
+        return {f"{machine}/{a}": w for a, w in json.loads(r.stdout).items()}
+    except (OSError, ValueError, AttributeError, subprocess.SubprocessError):
+        return {}  # unreachable, no python3 there, or an older copy: its agents stay as Herdr shows them
+
+
+def machines():
+    try:
+        return [m["name"] for m in json.loads(hc("machine", "ls", "--json"))["machines"] if m.get("state") == "connected"]
+    except (ValueError, KeyError, TypeError):
+        return []
+
+
 def main():
+    pool = ThreadPoolExecutor(max_workers=8)
+    others = [] if "--local" in sys.argv else [pool.submit(remote, m) for m in machines()]
     try:
         terms = json.loads(hc("ls", "--json"))["terminals"]
     except (ValueError, KeyError):
         sys.exit("holding: hc ls failed")
-    # Only where Herdr shows nothing going on.
-    terms = [t for t in terms if t.get("agent") == "claude-code" and t.get("status") in ("done", "idle")]
+    # Only where Herdr shows nothing going on; "/" in an address means another machine, which runs its own copy.
+    terms = [t for t in terms if t.get("agent") == "claude-code" and t.get("status") in ("done", "idle")
+             and "/" not in t["address"]]
     try:
         cache = json.load(open(CACHE))
     except (OSError, ValueError):
         cache = {}
     known, now, out = sessions(), time.time(), {}
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        seen = list(pool.map(inspect, terms))
+    seen = list(pool.map(inspect, terms))
     for address, pid, counts in seen:
         why = list(counts)
-        # "/" in an address means another machine: its pid means nothing here, only the footer applies.
-        if "/" not in address and pid in known:
+        if pid in known:
             session, config_dir = known[pid]
             status, age = session.get("status"), now - session.get("statusUpdatedAt", 0) / 1000
             if not why and status == "shell":
@@ -185,6 +204,8 @@ def main():
     with open(tmp, "w") as f:
         json.dump({p: s for p, s in cache.items() if p in live}, f)
     os.replace(tmp, CACHE)
+    for f in others:
+        out.update(f.result())
     print(json.dumps(out))
 
 

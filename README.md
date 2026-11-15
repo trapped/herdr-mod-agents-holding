@@ -6,7 +6,7 @@ adds a "Waiting" section to the Agents list for those agents, with the reason on
 ("1 monitor", "schedule", "wakes 14:30").
 
 Verified against Claude Code 2.1.323. Every source is a Claude Code internal and may change.
-Agents on other machines get the footer counts only (monitors and shells).
+Agents on other machines too, if they have `python3` and `hc` (see below).
 
 ## Install
 
@@ -42,6 +42,10 @@ Everything else stays as Herdr reports it. If a source stops working, rows fall 
   count, because session timers die with the process. Recurring schedules expire after 7 days.
 - Footer: the `N monitor · N shell · ↓ to manage` line, read with `hc read <t> --lines 0`.
 
+## Other machines
+
+`holding.py` runs itself on every connected machine from `hc machine ls` (`hc exec --on <machine> python3 - --local`, script on stdin, nothing installed there) and merges the answers as `<machine>/<terminal>`. Each machine reads its own session files, transcripts and footers.
+
 ## Known gaps
 
 - **Case 7 is a gap.** Claude Code leaves these task types (`monitor_mcp`, `monitor_ws`,
@@ -51,7 +55,7 @@ Everything else stays as Herdr reports it. If a source stops working, rows fall 
   records them: check the session file's `status` values and `holding.py`'s footer parsing
   against a real one.
 - A saved schedule (case 6) created by an earlier session and picked up by this one is not seen.
-- Agents on other machines (`<machine>/tN`) are covered by the footer only: their session files and transcripts live there, so schedules, wake-ups, PR watches and background agents are not seen.
+- Agents on other machines need `python3` and `hc` there, and a connected `hc machine`. A machine that can't be reached, or lacks python3, shows its agents as Herdr does.
 - Not detected at all, because nothing is running: an agent waiting on a person, a turn cut short
   by an error or a limit, and unsent text in the prompt box.
 
